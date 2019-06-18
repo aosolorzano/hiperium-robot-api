@@ -12,8 +12,14 @@
  */
 package com.hiperium.robot.api.main;
 
+import java.io.IOException;
+import java.util.Properties;
+
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
+import com.hiperium.robot.api.util.EnumRobotFunction;
+import com.hiperium.robot.api.util.EnumRobotModel;
 import com.rapplogic.xbee.api.ApiId;
 import com.rapplogic.xbee.api.PacketListener;
 import com.rapplogic.xbee.api.XBee;
@@ -33,6 +39,18 @@ public class DeviceMessageListener implements PacketListener {
 	/** The LOGGER property for logger messages. */
 	private static final Logger LOGGER = Logger.getLogger(DeviceMessageListener.class);
 
+	private static final String PYTHON = "python";
+	private static final String PORT_NAME = "/dev/ttyUSB0";
+	private static final String PROPERTIES_FILE_NAME = "scripts.properties";
+	private static final String PICAR_S_PROPERTY_NAME = "picar.s.";
+	private static final String YAHBOOM_4WD_PROPERTY_NAME = "yahbomm.4wd.";
+
+	/** The property PROPERTIES. */
+	private static final Properties PROPERTIES = new Properties();
+
+	/** The property pythonProcess. */
+	private Process pythonProcess;
+
 	/** The property xbee. */
 	private XBee xbee;
 
@@ -40,38 +58,113 @@ public class DeviceMessageListener implements PacketListener {
 	private int[] data;
 
 	/**
+	 * Class initialization.
+	 */
+	static {
+		try {
+			PROPERTIES.load(DeviceMessageListener.class.getClassLoader().getResourceAsStream(PROPERTIES_FILE_NAME));
+		} catch (Exception e) {
+			LOGGER.error(e.getMessage(), e);
+		}
+	}
+
+	/**
 	 * Class constructor.
 	 */
 	public DeviceMessageListener() {
+		this.pythonProcess = null;
 		this.xbee = new XBee();
 		this.data = new int[3];
 	}
 
 	/**
-	 * Start XBEE device listening.
+	 * Start XBEE Radio package listening.
 	 * 
 	 * @throws XBeeException
 	 */
 	public void startXbeePackageListener() throws XBeeException {
 		LOGGER.info("startXbeePackageListener() - START");
-		this.xbee.open("/dev/ttyUSB0", 9600);
+		this.xbee.open(PORT_NAME, 9600);
 		this.xbee.addPacketListener(this);
 		LOGGER.info("startXbeePackageListener() - END");
 	}
 
 	/**
-	 * Receives data from devices and send it to the Hiperium Cloud Platform.
+	 * Receives data from IoT Gateway to control the Robot.
 	 */
 	@Override
 	public void processResponse(XBeeResponse response) {
-		LOGGER.info("processResponse - START");
 		if (response.getApiId() == ApiId.RX_16_RESPONSE) {
 			RxResponse16 response16 = (RxResponse16) response;
 			this.data = response16.getData();
+			LOGGER.info("**** RECEIVED DATA *****");
 			for (int i = 0; i < this.data.length; i++) {
 				LOGGER.info("Data[" + i + "]: " + this.data[i]);
 			}
+			if (this.data.length == 3 && this.data[0] == 0) { // DEACTIVATE ROBOT
+				this.stopPythonProcess();
+			} else if (this.data.length == 3 && this.data[1] != 0 && this.data[2] != 0) { // ACTIVATE ROBOT MODULE
+				EnumRobotModel enumRobotModel = EnumRobotModel.getModelByValue(this.data[1]);
+				EnumRobotFunction enumRobotFunction = EnumRobotFunction.getFunctionByValue(this.data[2]);
+				try {
+					this.callRobotFunctionByModel(enumRobotModel, enumRobotFunction);
+				} catch (IOException | InterruptedException e) {
+					LOGGER.error(e.getMessage(), e);
+				}
+
+			}
 		}
-		LOGGER.info("processResponse - END");
+	}
+
+	/**
+	 * Verifies the robot model before call the correct function.
+	 * 
+	 * @param enumRobotModel
+	 * @param enumRobotFunction
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	private void callRobotFunctionByModel(EnumRobotModel enumRobotModel, EnumRobotFunction enumRobotFunction)
+			throws IOException, InterruptedException {
+		LOGGER.info("ROBOT MODEL: " + enumRobotModel.name());
+		LOGGER.info("ROBOT FUNCTION: " + enumRobotFunction.name());
+		switch (enumRobotModel) {
+		case PICAR_S:
+			this.callRobotFunction(PICAR_S_PROPERTY_NAME, enumRobotFunction);
+			break;
+		case YAHBOOM_4WD_PI:
+			this.callRobotFunction(YAHBOOM_4WD_PROPERTY_NAME, enumRobotFunction);
+			break;
+		default:
+			break;
+		}
+	}
+
+	/**
+	 * Calls the robot's python script.
+	 * 
+	 * @param robotModelKey
+	 * @param enumRobotFunction
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	private void callRobotFunction(String robotModelKey, EnumRobotFunction enumRobotFunction)
+			throws IOException, InterruptedException {
+		String script = PROPERTIES.getProperty(robotModelKey.concat(enumRobotFunction.getPropertyName()));
+		LOGGER.info("SCRIPT TO EXECUTE: " + script);
+		if (StringUtils.isNotBlank(script)) {
+			ProcessBuilder pb = new ProcessBuilder(PYTHON, script);
+			this.pythonProcess = pb.start();
+		}
+	}
+
+	/**
+	 * Stops the execution of the python process.
+	 */
+	private void stopPythonProcess() {
+		if (null != this.pythonProcess && this.pythonProcess.isAlive()) {
+			LOGGER.info("DESTROY THE CURRENT PROCESS");
+			this.pythonProcess.destroy();
+		}
 	}
 }

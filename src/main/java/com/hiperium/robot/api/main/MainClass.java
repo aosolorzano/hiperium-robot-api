@@ -12,7 +12,6 @@
  */
 package com.hiperium.robot.api.main;
 
-import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
 
 /**
@@ -30,33 +29,13 @@ public class MainClass {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		BasicConfigurator.configure();
 		LOGGER.info("Main class - START");
-		MainClass mainClass = new MainClass();
-		mainClass.init();
-		synchronized (mainClass) {
-			try {
-				mainClass.wait();
-			} catch (InterruptedException ie) {
-				LOGGER.error(ie.getMessage(), ie);
-			}
-		}
-		LOGGER.info("Main class - END");
-	}
-
-	/**
-	 * Starts the XBee communication.
-	 * 
-	 */
-	private void init() {
-		LOGGER.info("Device Listener Configuration - BEGIN");
 		DeviceMessageListener deviceMessageListener = new DeviceMessageListener();
 		try {
 			deviceMessageListener.startXbeePackageListener();
 		} catch (Exception e) {
 			LOGGER.error(e.getMessage(), e);
 		}
-		LOGGER.info("Device Listener Configuration - END");
+		LOGGER.info("Main class - END");
 	}
-
 }
