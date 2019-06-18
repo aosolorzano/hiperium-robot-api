@@ -55,6 +55,12 @@
 			<artifactId>xbee-api</artifactId>
 			<version>0.9.3</version>
 		</dependency>
+		<!-- JYTHON API -->
+		<dependency>
+			<groupId>org.python</groupId>
+			<artifactId>jython</artifactId>
+			<version>2.7.0</version>
+		</dependency>
 		<!-- APACHE COMMONS -->
 		<dependency>
 			<groupId>commons-lang</groupId>
