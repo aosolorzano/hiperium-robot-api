@@ -10,7 +10,7 @@
  * Copyright 2014 Andres Solorzano. All rights reserved.
  * 
  */
-package com.hiperium.robot.api.util;
+package com.hiperium.robot.api.util.enums;
 
 /**
  * 

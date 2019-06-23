@@ -18,8 +18,8 @@ import java.util.Properties;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
-import com.hiperium.robot.api.util.EnumRobotFunction;
-import com.hiperium.robot.api.util.EnumRobotModel;
+import com.hiperium.robot.api.util.enums.EnumRobotFunction;
+import com.hiperium.robot.api.util.enums.EnumRobotModel;
 import com.rapplogic.xbee.api.ApiId;
 import com.rapplogic.xbee.api.PacketListener;
 import com.rapplogic.xbee.api.XBee;
@@ -39,7 +39,6 @@ public class DeviceMessageListener implements PacketListener {
 	/** The LOGGER property for logger messages. */
 	private static final Logger LOGGER = Logger.getLogger(DeviceMessageListener.class);
 
-	private static final String PYTHON = "python";
 	private static final String PORT_NAME = "/dev/ttyUSB0";
 	private static final String PROPERTIES_FILE_NAME = "scripts.properties";
 	private static final String PICAR_S_PROPERTY_NAME = "picar.s.";
@@ -48,8 +47,8 @@ public class DeviceMessageListener implements PacketListener {
 	/** The property PROPERTIES. */
 	private static final Properties PROPERTIES = new Properties();
 
-	/** The property pythonProcess. */
-	private Process pythonProcess;
+	/** The property processExec. */
+	private ProcessExec processExec;
 
 	/** The property xbee. */
 	private XBee xbee;
@@ -72,7 +71,7 @@ public class DeviceMessageListener implements PacketListener {
 	 * Class constructor.
 	 */
 	public DeviceMessageListener() {
-		this.pythonProcess = null;
+		this.processExec = null;
 		this.xbee = new XBee();
 		this.data = new int[3];
 	}
@@ -151,10 +150,12 @@ public class DeviceMessageListener implements PacketListener {
 	private void callRobotFunction(String robotModelKey, EnumRobotFunction enumRobotFunction)
 			throws IOException, InterruptedException {
 		String script = PROPERTIES.getProperty(robotModelKey.concat(enumRobotFunction.getPropertyName()));
-		LOGGER.info("SCRIPT TO EXECUTE: " + script);
-		if (StringUtils.isNotBlank(script)) {
-			ProcessBuilder pb = new ProcessBuilder(PYTHON, script);
-			this.pythonProcess = pb.start();
+
+		if (StringUtils.isBlank(script)) {
+			LOGGER.info("NO SCRIPT FOUND TO EXECUTE...");
+		} else {
+			this.processExec = new ProcessExec(script);
+			this.processExec.start();
 		}
 	}
 
@@ -162,9 +163,8 @@ public class DeviceMessageListener implements PacketListener {
 	 * Stops the execution of the python process.
 	 */
 	private void stopPythonProcess() {
-		if (null != this.pythonProcess && this.pythonProcess.isAlive()) {
-			LOGGER.info("DESTROY THE CURRENT PROCESS");
-			this.pythonProcess.destroy();
+		if (null != this.processExec) {
+			this.processExec.stopPythonProcess();
 		}
 	}
 }
